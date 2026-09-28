@@ -87,3 +87,9 @@ tmp/
 ehthumbs.db
 Thumbs.db
 [Dd]esktop.ini
+
+# Release pipeline state
+release/
+
+# Release pipeline state (internal, not for public repo)
+release/
