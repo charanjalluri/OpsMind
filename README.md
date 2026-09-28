@@ -1,5 +1,7 @@
 # OpsMind
 
+[![CI](https://github.com/charanjalluri/OpsMind/actions/workflows/ci.yml/badge.svg)](https://github.com/charanjalluri/OpsMind/actions/workflows/ci.yml)
+
 > **AI Incident Response Agent with Persistent Engineering Memory**  
 > Built for **HackwithHyderabad 3.0**
 
