@@ -1,0 +1,225 @@
+[
+  {
+    "incident_id": "INC-1042",
+    "memory_type": "incident",
+    "title": "Database connection pool regression in payment-api after v2.9.0",
+    "service": "payment-api",
+    "environment": "production",
+    "deployment_version": "v2.9.0",
+    "symptoms": [
+      "HTTP 502 Bad Gateway responses increased immediately after deployment v2.9.0",
+      "Spike in gateway timeouts on /v1/charges and /v1/refunds",
+      "Downstream services receiving 502 from payment ingress"
+    ],
+    "suspected_cause": "Database bottleneck or network blip during rolling deployment",
+    "confirmed_root_cause": "Database connection pool configuration regression: pool_max was inadvertently decreased from 50 to 5 in v2.9.0 config, leading to connection starvation under standard traffic.",
+    "investigation_steps": [
+      "Monitored HTTP status code distribution on ingress ALB",
+      "Compared connection pool configuration between v2.8.4 and v2.9.0 release manifests",
+      "Observed exhausted database connection pool metrics in RDS metrics dashboard",
+      "Verified active PostgreSQL connections were pegged at pool limit (5)"
+    ],
+    "actions_taken": [
+      "Initiated immediate rollback of payment-api deployment from v2.9.0 back to v2.8.4",
+      "Restored the previous connection pool configuration (pool_max=50)",
+      "Monitored database connection count and HTTP 502 error rates"
+    ],
+    "resolution": "Rolled back v2.9.0 release and restored previous connection pool configuration parameters.",
+    "outcome": "Successful. Errors returned to baseline within 2 minutes of rollback completion. No data corruption.",
+    "impact": "12 minutes of elevated 502 errors affecting ~8% of payment checkout attempts.",
+    "duration": "14 minutes",
+    "failed_approaches": [
+      "Initially considered scaling out worker replicas, but realized connection pool per pod was too small and would overwhelm DB backend without fixing config."
+    ],
+    "successful_approaches": [
+      "Config diff comparison between release tags v2.8.4 and v2.9.0",
+      "Fast rollback rather than in-place patching"
+    ],
+    "engineering_decisions": [
+      "Roll back immediately rather than testing in-place config edits under active outage."
+    ],
+    "warnings": [
+      "Do not attempt pod restarts before inspecting connection pool limits, as restarts will drop active database connections."
+    ],
+    "lessons_learned": [
+      "For payment-api 502 errors immediately after deployment, compare database connection pool configuration before restarting infrastructure."
+    ]
+  },
+  {
+    "incident_id": "INC-1067",
+    "memory_type": "incident",
+    "title": "Environment variable configuration mismatch on payment-api v2.9.5",
+    "service": "payment-api",
+    "environment": "production",
+    "deployment_version": "v2.9.5",
+    "symptoms": [
+      "HTTP 502 errors immediately after deployment v2.9.5",
+      "Upstream bank payment gateway requests timing out after 30s",
+      "Health check probes intermittently failing on newly deployed pods"
+    ],
+    "suspected_cause": "Third-party payment gateway downtime or DNS degradation",
+    "confirmed_root_cause": "Incorrect environment configuration introduced during deployment: PAYMENT_GATEWAY_TIMEOUT_MS was set to 500ms instead of 5000ms, and upstream auth header variable name was misspelled.",
+    "investigation_steps": [
+      "Checked gateway provider status page and verified external gateway was healthy",
+      "Examined application logs for timeout traces",
+      "Inspected Kubernetes ConfigMap and Secret diff between v2.9.4 and v2.9.5",
+      "Found incorrect environment variables applied during the CI/CD release pipeline"
+    ],
+    "actions_taken": [
+      "Triggered emergency rollback of deployment to v2.9.4",
+      "Corrected the environment variables in the Helm values repository",
+      "Re-deployed verified configuration with staging validation"
+    ],
+    "resolution": "Rolled back deployment to v2.9.4 and corrected environment configuration.",
+    "outcome": "Successful. 502 errors cleared immediately upon rollback completion.",
+    "impact": "6 minutes of failed transactions for European card processing.",
+    "duration": "9 minutes",
+    "failed_approaches": [
+      "Contacted external payment gateway support before verifying internal configuration diff."
+    ],
+    "successful_approaches": [
+      "Inspecting git diff on environment configuration and Helm release manifests."
+    ],
+    "engineering_decisions": [
+      "Enforce automated linting and schema validation on all deployment environment variables."
+    ],
+    "warnings": [
+      "Always inspect environment variable and secrets diffs when 502 errors occur within minutes of deployment."
+    ],
+    "lessons_learned": [
+      "For payment-api 502 errors following a release, verify environment variable and gateway timeout configurations before assuming external provider downtime."
+    ]
+  },
+  {
+    "incident_id": "INC-1091",
+    "memory_type": "incident",
+    "title": "Duplicate payment processing caused by uncoordinated emergency restart",
+    "service": "payment-api",
+    "environment": "production",
+    "deployment_version": "v2.10.1",
+    "symptoms": [
+      "Production instability, request latency degradation, and intermittent HTTP 500/504 errors"
+    ],
+    "suspected_cause": "Memory leak or locked workers in payment processing pipeline",
+    "confirmed_root_cause": "Under heavy traffic, workers were slow due to database lock contention. An on-call engineer executed an emergency restart of the payment-api pods while transactions were in-flight, severing active database connections without graceful draining.",
+    "investigation_steps": [
+      "Checked server resource utilization and worker threads",
+      "Reviewed pod lifecycle events and restart timestamps in Kubernetes audit logs",
+      "Analyzed transaction reconciliation reports indicating identical idempotency keys re-executed across pod restarts",
+      "Identified uncommitted 2PC transactions retried by upstream client queues"
+    ],
+    "actions_taken": [
+      "Halted automated retry queues to prevent further duplicate submissions",
+      "Executed database reconciliation script to identify and reverse duplicate authorizations",
+      "Notified affected customers and finance team of duplicate authorization holds"
+    ],
+    "resolution": "Stopped emergency restarts, allowed pods to drain cleanly, and resolved database lock contention via index optimization.",
+    "outcome": "Restart temporarily reduced errors but caused duplicate payment processing for a subset of requests. Required 4 hours of manual financial reconciliation.",
+    "impact": "47 customer transactions charged twice, $12,400 in duplicate pending authorizations.",
+    "duration": "4 hours 15 minutes",
+    "failed_approaches": [
+      "Executing 'kubectl rollout restart deployment/payment-api' as an immediate reflexive fix during active payment traffic without checking in-flight transactions."
+    ],
+    "successful_approaches": [
+      "Freezing retry queues and auditing transaction ledger with finance."
+    ],
+    "engineering_decisions": [
+      "Establish strict engineering policy forbidding automatic or emergency restarts of payment-api without drain verification."
+    ],
+    "warnings": [
+      "CRITICAL: Do not blindly restart payment-api during payment incidents. Sudden restarts sever in-flight transactions and induce retry storms that create duplicate charges."
+    ],
+    "lessons_learned": [
+      "Do not blindly restart payment-api during payment incidents. Graceful draining and idempotency guarantees must be verified before cycling payment services."
+    ]
+  },
+  {
+    "incident_id": "DECISION-PAYMENT-RESTART",
+    "memory_type": "decision",
+    "title": "Engineering Decision: payment-api restart policy",
+    "service": "payment-api",
+    "environment": "production",
+    "deployment_version": null,
+    "symptoms": [
+      "High latency, elevated 5xx errors, or perceived service hang"
+    ],
+    "suspected_cause": null,
+    "confirmed_root_cause": null,
+    "investigation_steps": [
+      "1. Check deployment changelog and release diffs from recent deployments",
+      "2. Inspect database connectivity, active connection count, and connection pool saturation",
+      "3. Inspect environment variables, timeout thresholds, and upstream credentials",
+      "4. Verify queue lag and downstream gateway health before touching service lifecycle"
+    ],
+    "actions_taken": [
+      "Formalized engineering standard in runbooks and CI/CD operations manual"
+    ],
+    "resolution": "Adopted mandatory operational rule prohibiting emergency restarts without lead SRE sign-off and drained queues.",
+    "outcome": "Zero duplicate charge incidents recorded since policy adoption.",
+    "impact": "Protects payment ledger integrity across all production incidents.",
+    "duration": null,
+    "failed_approaches": [
+      "Treating payment-api as a stateless service that can be freely restarted."
+    ],
+    "successful_approaches": [
+      "Root-cause diagnosis focusing on configuration, pool limits, and upstream timeouts first."
+    ],
+    "engineering_decisions": [
+      "Do not automatically restart payment-api during production incidents.",
+      "Reason: A previous emergency restart (INC-1091) caused duplicate payment processing.",
+      "Preferred approach: Investigate deployment changes, database connectivity, connection pools, and configuration before restarting the service.",
+      "Risk: Automatic restart can worsen payment consistency problems."
+    ],
+    "warnings": [
+      "AUTOMATIC OR REFLEXIVE RESTART PROHIBITED: Restarting payment-api under load risks data loss and duplicate customer charges."
+    ],
+    "lessons_learned": [
+      "Payment services require strict transactional consistency. Always investigate configuration and connection pools rather than restarting infrastructure."
+    ]
+  },
+  {
+    "incident_id": "INC-1110",
+    "memory_type": "incident",
+    "title": "Elevated 5xx errors in orders-api after deployment due to misconfigured environment variable",
+    "service": "orders-api",
+    "environment": "production",
+    "deployment_version": "v1.14.2",
+    "symptoms": [
+      "Elevated 5xx errors (HTTP 500 and 503) after deployment v1.14.2",
+      "Order placement endpoint /orders failing for all checkout flows",
+      "Application pod logs reporting 'Invalid configuration key: INVENTORY_SERVICE_PORT'"
+    ],
+    "suspected_cause": "Inventory service outage or network partition between orders and inventory clusters",
+    "confirmed_root_cause": "Bad environment variable configuration: INVENTORY_SERVICE_PORT was set to string 'http' instead of integer '8080' during helm template rendering.",
+    "investigation_steps": [
+      "Checked inventory service status and confirmed it was running normally",
+      "Inspected container logs for stack traces showing startup and runtime parse errors",
+      "Compared environment variables between v1.14.1 and v1.14.2 in deployment manifests",
+      "Identified bad port format in ConfigMap"
+    ],
+    "actions_taken": [
+      "Rolled back orders-api to v1.14.1 deployment manifest",
+      "Corrected the port specification in helm values for v1.14.2",
+      "Validated order creation in staging and re-deployed"
+    ],
+    "resolution": "Rollback and correct configuration in deployment parameters.",
+    "outcome": "Successful. Errors dropped to zero within 90 seconds of rollback.",
+    "impact": "8 minutes of order submission failure, approximately 110 blocked orders.",
+    "duration": "11 minutes",
+    "failed_approaches": [
+      "Investigating inventory service cluster when the defect was localized to the orders-api configuration."
+    ],
+    "successful_approaches": [
+      "Diffing environment variables between previous known-good release and current release."
+    ],
+    "engineering_decisions": [
+      "Add strict type checking and CI schema validation for all numeric environment variables."
+    ],
+    "warnings": [
+      "Always check container logs for configuration validation errors immediately after deployment."
+    ],
+    "lessons_learned": [
+      "For post-deployment 5xx spikes, compare environment/configuration changes against the previous known-good release."
+    ]
+  }
+]
