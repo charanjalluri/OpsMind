@@ -3,7 +3,7 @@ from typing import Optional
 from backend.app.config import Settings, get_settings
 from backend.app.memory.hindsight import HindsightMemory, HindsightConfigurationError, HindsightServiceError
 from backend.app.memory.recall import construct_incident_query
-from backend.app.llm.muse import MuseClient, MetaModelConfigurationError, MetaModelServiceError
+from backend.app.llm.muse import MuseClient, MetaModelConfigurationError
 from backend.app.agent.prompts import SYSTEM_PROMPT, build_investigation_user_prompt
 from backend.app.schemas.incident import (
     IncidentInvestigationRequest,

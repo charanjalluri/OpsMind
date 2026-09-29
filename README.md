@@ -3,7 +3,7 @@
 [![CI](https://github.com/charanjalluri/OpsMind/actions/workflows/ci.yml/badge.svg)](https://github.com/charanjalluri/OpsMind/actions/workflows/ci.yml)
 
 > **AI Incident Response Agent with Persistent Engineering Memory**  
-> Built for **HackwithHyderabad 3.0**
+> Stateful incident investigation grounded in historical engineering experience via Hindsight.
 
 OpsMind addresses a persistent failure in SRE and platform operations: **engineering teams repeatedly solve the same production incidents from scratch**. Institutional knowledge is routinely lost across scattered postmortems, Slack war-rooms, and resolved tickets.
 
@@ -300,9 +300,9 @@ During investigation, `POST /api/investigations`:
 
 ---
 
-## Hackathon Context & Roadmap
+## Architecture & Roadmap
 
-Built for **HackwithHyderabad 3.0** to demonstrate how stateful, persistent AI memory transforms engineering incident response.
+OpsMind demonstrates how stateful, persistent AI memory transforms engineering incident response from repetitive guesswork into a compounding organizational asset.
 
 ### Future Roadmap
 - Real-time OpenTelemetry and Prometheus alert webhook ingestion

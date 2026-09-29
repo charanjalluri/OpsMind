@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 from typing import Optional, Dict, Any, List, Union
 from openai import OpenAI

@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-3 text-slate-500">
-        <span>HackwithHyderabad 3.0</span>
+        <span>Persistent Engineering Memory</span>
         <span>•</span>
         <span>FastAPI Connected</span>
       </div>

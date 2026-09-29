@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from hindsight_client import RecallResponse
 from backend.app.memory.hindsight import HindsightMemory
 from backend.app.schemas.incident import (

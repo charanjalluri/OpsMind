@@ -1,9 +1,9 @@
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.app.config import Settings, get_settings
 from backend.app.memory.hindsight import (
